@@ -8,17 +8,13 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-export default function RegisterLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RegisterLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`${inter.variable}+ antialiased min-h-screen bg-white`}>
+    <div className={`${inter.variable} antialiased min+-h-screen bg-white`}>
       <style jsx global>{`
-        .home-layout {
+      .home-layout {
           display: none;
-        }
+      }
       `}</style>
       {children}
     </div>

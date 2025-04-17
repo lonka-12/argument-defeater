@@ -21,7 +21,6 @@ export default function ArgueLayout({
           display: none;
         }
       `}</style>
-      <Navbar />
       {children}
     </div>
   );

@@ -15,19 +15,10 @@ export const metadata: Metadata = {
   description: "Analyze and counter arguments with AI",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <div className="home-layout">
-          <Navbar />
-          <PromoBanner />
-          <MainTitle />
-        </div>
         {children}
       </body>
     </html>
