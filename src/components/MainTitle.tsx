@@ -18,7 +18,7 @@ const MainTitle: React.FC = () => {
         Start for free
       </Link>
       <p className="text-gray-400 text-sm font-medium mt-4 max-w-4xl text-center">
-        No credit card required
+        No Paywall, No Credit Card Required
       </p>
     </div>
   )
