@@ -1,27 +1,85 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import { signIn, useSession } from 'next-auth/react'
+import { register } from '../actions/register'
 
-const RegisterPage = () => {
+export default function RegisterPage() {
   const router = useRouter()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-
-  const createSession = async (idToken: string) => {
-    
+  const [isLoading, setIsLoading] = useState(false)
+  const { data: session, status } = useSession()
+  const searchParams = useSearchParams()
+  
+  // Get error from URL if present
+  useEffect(() => {
+    const errorParam = searchParams?.get('error')
+    if (errorParam === 'EmailAlreadyRegistered') {
+      setError('This email is already registered with a password. Please use password login instead.')
+    } else if (errorParam) {
+      setError(errorParam)
+    }
+  }, [searchParams])
+  
+  // Redirect if already authenticated
+  if (status === 'authenticated') {
+    router.push('/argue')
   }
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
-    
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    const formData = new FormData(e.target as HTMLFormElement)
+    const name = formData.get('name') as string
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+
+    try {
+      // Register the user
+      const result = await register({ name, email, password })
+      
+      if (!result.success) {
+        setError(result.error || 'Registration failed')
+        setIsLoading(false)
+        return
+      }
+      
+      // If registration successful, sign in
+      const signInResult = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+        callbackUrl: '/argue'
+      })
+      
+      if (signInResult?.error) {
+        setError(signInResult.error)
+        setIsLoading(false)
+      } else {
+        router.push('/argue')
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error)
+      setError(error.message || 'An error occurred')
+      setIsLoading(false)
+    }
   }
 
   const handleGoogleSignUp = async () => {
-    
+    setIsLoading(true)
+    setError('')
+
+    try {
+      await signIn('google', { callbackUrl: '/argue' })
+    } catch (error: any) {
+      setError(error.message || 'Failed to sign in with Google')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -50,12 +108,12 @@ const RegisterPage = () => {
                   Name:
                 </label>
                 <input
+                  name="name"
                   type="text"
                   placeholder="John Doe"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="relative">
@@ -63,12 +121,12 @@ const RegisterPage = () => {
                   Email:
                 </label>
                 <input
+                  name="email"
                   type="email"
                   placeholder="john.doe@example.com"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="relative">
@@ -76,20 +134,21 @@ const RegisterPage = () => {
                   Password:
                 </label>
                 <input
+                  name="password"
                   type="password"
                   placeholder="••••••••"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
             <button
               type="submit"
-              className="w-full bg-purple-600 text-white py-4 px-4 rounded-lg hover:bg-purple-700 transition-colors text-xl font-bold"
+              className="w-full bg-purple-600 text-white py-4 px-4 rounded-lg hover:bg-purple-700 transition-colors text-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isLoading}
             >
-              Sign up
+              {isLoading ? 'Signing up...' : 'Sign up'}
             </button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -103,6 +162,7 @@ const RegisterPage = () => {
               type="button"
               onClick={handleGoogleSignUp}
               className="w-full bg-white text-gray-700 py-3 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-lg font-medium flex items-center justify-center"
+              disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -122,7 +182,7 @@ const RegisterPage = () => {
                   fill="#EA4335"
                 />
               </svg>
-              Sign up with Google
+              {isLoading ? 'Continuing...' : 'Continue with Google'}
             </button>
             <div className="text-center text-gray-600">
               Already have an account?{' '}
@@ -137,5 +197,3 @@ const RegisterPage = () => {
     </>
   )
 }
-
-export default RegisterPage

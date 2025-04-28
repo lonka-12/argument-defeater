@@ -3,12 +3,19 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 
 const Navbar = () => {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { data: session } = useSession()
 
   const handleSignOut = async () => {
+    try {
+      await signOut({ redirect: false })
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
   }
 
   return (
@@ -23,21 +30,21 @@ const Navbar = () => {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {user ? (
+            {session ? (
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  {user.photoURL ? (
+                  {session.user?.image ? (
                     <img
-                      src={user.photoURL}
+                      src={session.user.image}
                       alt="Profile"
                       className="h-8 w-8 rounded-full"
                     />
                   ) : (
                     <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center text-white">
-                      {user.email?.[0].toUpperCase()}
+                      {session.user?.email?.[0].toUpperCase()}
                     </div>
                   )}
-                  <span className="text-gray-700">{user.email}</span>
+                  <span className="text-gray-700">{session.user?.email}</span>
                 </div>
                 <button
                   onClick={handleSignOut}

@@ -1,23 +1,66 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { signIn, useSession } from 'next-auth/react'
 
 export default function LoginPage() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter();
-
-  async function handleEmailSubmit(formData: FormData) {
+  const router = useRouter()
+  const { data: session, status } = useSession()
+  const searchParams = useSearchParams()
+  
+  // Get error from URL if present
+  useEffect(() => {
+    const errorParam = searchParams?.get('error')
+    if (errorParam === 'OAuthAccountNotLinked') {
+      setError('This email is already registered with a password. Please use password login instead.')
+    } else if (errorParam) {
+      setError(errorParam)
+    }
+  }, [searchParams])
+  
+  // Redirect if already authenticated
+  if (status === 'authenticated') {
+    router.push('/argue')
+  }
+  //TODO: add password strength check and email validation
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault()
     setIsLoading(true)
     setError('')
+
+    const formData = new FormData(e.target as HTMLFormElement)
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+
+    try {
+      await signIn('credentials', {
+        email,
+        password,
+        callbackUrl: '/argue'
+      })
+    } catch (error: any) {
+      console.error('Login error:', error)
+      setError(error.message || 'An error occurred')
+      setIsLoading(false)
+    }
   }
 
   async function handleGoogleSignIn() {
     setIsLoading(true)
     setError('')
+
+    try {
+      await signIn('google', { callbackUrl: '/argue' })
+    } catch (error: any) {
+      console.error('Continue with Google error:', error)
+      setError(error.message || 'Failed to continue with Google')
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -34,7 +77,7 @@ export default function LoginPage() {
             </p>
           </div>
           <div className="bg-gray-50 p-8 rounded-xl shadow-sm">
-            <form action={handleEmailSubmit} className="space-y-6">
+            <form onSubmit={handleEmailSubmit} className="space-y-6">
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                   <span className="block sm:inline">{error}</span>
@@ -86,7 +129,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
-                className="w-full bg-white text-gray-700 py-3 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-lg font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-white text-gray-700 py-3 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors text-lg font-medium flex items-center justify-center"
                 disabled={isLoading}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -107,7 +150,7 @@ export default function LoginPage() {
                     fill="#EA4335"
                   />
                 </svg>
-                {isLoading ? 'Signing in...' : 'Log in with Google'}
+                {isLoading ? 'Continuing...' : 'Continue with Google'}
               </button>
               <div className="text-center text-gray-600">
                 Don't have an account?{' '}
