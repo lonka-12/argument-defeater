@@ -3,6 +3,8 @@
 import { connectDB } from "@/lib/mongodb"
 import User from "@/models/User"
 import bcrypt from "bcryptjs"
+import crypto from "crypto"
+import { sendVerificationEmail } from "@/lib/email"
 
 export async function register(data: { name: string; email: string; password: string }) {
   try {
@@ -20,25 +22,40 @@ export async function register(data: { name: string; email: string; password: st
     // Hash password
     const hashedPassword = await bcrypt.hash(data.password, 10)
     
-    // Create new user with explicit emailVerified field
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex')
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    
+    // Create new user
     const newUser = new User({
       name: data.name,
       email: data.email.toLowerCase().trim(),
       password: hashedPassword,
-      emailVerified: true // Explicitly set to true
+      emailVerified: false,
+      verificationToken,
+      verificationTokenExpires
     })
     
     // Save to database
     const savedUser = await newUser.save()
     
-    console.log('User registered successfully:', {
-      id: savedUser._id,
-      email: savedUser.email,
-      emailVerified: savedUser.emailVerified
-    })
+    // Send verification email
+    console.log("sending email")
+    const emailSent = await sendVerificationEmail(data.email, verificationToken)
+    console.log("email sent", emailSent)
+    
+    if (!emailSent) {
+      // If email fails to send, delete the user and return error
+      await User.deleteOne({ _id: savedUser._id })
+      return {
+        success: false,
+        error: 'Failed to send verification email'
+      }
+    }
     
     return {
-      success: true
+      success: true,
+      message: 'Registration successful. Please check your email to verify your account.'
     }
   } catch (error: any) {
     console.error('Registration error:', error)

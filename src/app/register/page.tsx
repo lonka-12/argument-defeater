@@ -5,12 +5,15 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { signIn, useSession } from 'next-auth/react'
-import { register } from '../actions/register'
+import { checkEmailExists } from '../actions/checkEmail'
 
 export default function RegisterPage() {
   const router = useRouter()
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
   const { data: session, status } = useSession()
   const searchParams = useSearchParams()
   
@@ -23,49 +26,80 @@ export default function RegisterPage() {
       setError(errorParam)
     }
   }, [searchParams])
-  
-  // Redirect if already authenticated
-  if (status === 'authenticated') {
-    router.push('/argue')
+
+  // Validate email format
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const isValid = emailRegex.test(email)
+    
+    if (!isValid) {
+      setEmailError('Please enter a valid email address')
+    } else {
+      setEmailError('')
+    }
+    
+    return isValid
   }
 
-  const handleEmailSignUp = async (e: React.FormEvent) => {
+  // Handle email input change
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value
+    setEmail(newEmail)
+    
+    // Validate email on change, but only if there was already an error
+    if (emailError) {
+      validateEmail(newEmail)
+    }
+  }
+
+  const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    setSuccess('')
+    setEmailError('')
 
     const formData = new FormData(e.target as HTMLFormElement)
     const name = formData.get('name') as string
     const email = formData.get('email') as string
-    const password = formData.get('password') as string
+
+    if (!name || !email) {
+      setError('Please provide both name and email')
+      setIsLoading(false)
+      return
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      setIsLoading(false)
+      return
+    }
 
     try {
-      // Register the user
-      const result = await register({ name, email, password })
+      // Check if email already exists
+      const result = await checkEmailExists(email)
       
       if (!result.success) {
-        setError(result.error || 'Registration failed')
+        setError('Failed to validate email. Please try again.')
         setIsLoading(false)
         return
       }
       
-      // If registration successful, sign in
-      const signInResult = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-        callbackUrl: '/argue'
-      })
-      
-      if (signInResult?.error) {
-        setError(signInResult.error)
+      if (result.exists) {
+        setError('This email is already registered. Please use a different email or log in instead.')
         setIsLoading(false)
-      } else {
-        router.push('/argue')
+        return
       }
+      
+      // Store form data in sessionStorage temporarily
+      sessionStorage.setItem('registerName', name)
+      sessionStorage.setItem('registerEmail', email)
+      
+      // Redirect to password page
+      router.push('/register/password')
     } catch (error: any) {
-      console.error('Registration error:', error)
-      setError(error.message || 'An error occurred')
+      console.error('Email validation error:', error)
+      setError('An error occurred during validation. Please try again.')
       setIsLoading(false)
     }
   }
@@ -73,6 +107,7 @@ export default function RegisterPage() {
   const handleGoogleSignUp = async () => {
     setIsLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       await signIn('google', { callbackUrl: '/argue' })
@@ -96,10 +131,15 @@ export default function RegisterPage() {
           </p>
         </div>
         <div className="bg-gray-50 p-8 rounded-xl shadow-sm">
-          <form className="space-y-6" onSubmit={handleEmailSignUp}>
+          <form className="space-y-6" onSubmit={handleContinue}>
             {error && (
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                 <span className="block sm:inline">{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                <span className="block sm:inline">{success}</span>
               </div>
             )}
             <div className="space-y-4">
@@ -124,31 +164,24 @@ export default function RegisterPage() {
                   name="email"
                   type="email"
                   placeholder="john.doe@example.com"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className={`w-full px-4 py-3 border ${emailError ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent`}
                   required
                   disabled={isLoading}
+                  value={email}
+                  onChange={handleEmailChange}
+                  onBlur={(e) => validateEmail(e.target.value)}
                 />
-              </div>
-              <div className="relative">
-                <label className="block text-gray-700 text-base font-medium mb-2">
-                  Password:
-                </label>
-                <input
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                  required
-                  disabled={isLoading}
-                />
+                {emailError && (
+                  <p className="mt-1 text-sm text-red-500">{emailError}</p>
+                )}
               </div>
             </div>
             <button
               type="submit"
               className="w-full bg-purple-600 text-white py-4 px-4 rounded-lg hover:bg-purple-700 transition-colors text-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading}
+              disabled={isLoading || !!emailError}
             >
-              {isLoading ? 'Signing up...' : 'Sign up'}
+              {isLoading ? 'Processing...' : 'Continue'}
             </button>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

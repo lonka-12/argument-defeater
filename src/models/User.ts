@@ -1,19 +1,40 @@
-import mongoose, { Schema, model } from 'mongoose';
+import mongoose from 'mongoose';
 
 if (mongoose.models.User) {
   delete mongoose.models.User;
 }
 
-const UserSchema = new Schema(
-  {
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true, select: false },
-    name: { type: String, required: true },
-    image: { type: String, default: null },
-    emailVerified: { type: Boolean, default: true },
-  }
-);
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  verificationToken: {
+    type: String,
+    default: null,
+  },
+  verificationTokenExpires: {
+    type: Date,
+    default: null,
+  },
+  image: { type: String, default: null },
+}, {
+  timestamps: true,
+});
 
-const User = model('User', UserSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 export default User;

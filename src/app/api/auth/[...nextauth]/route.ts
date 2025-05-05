@@ -52,10 +52,8 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        // If emailVerified is undefined, set it to true for backward compatibility
-        if (user.emailVerified === undefined) {
-          user.emailVerified = true;
-          await user.save();
+        if (user.emailVerified != true) {
+          throw new Error("Please verify your email before logging in.");
         }
 
         return {

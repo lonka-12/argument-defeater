@@ -6,43 +6,87 @@ import Navbar from '@/components/Navbar'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn, useSession } from 'next-auth/react'
 
+// Error message mapping
+const errorMessages: { [key: string]: string } = {
+  CredentialsSignin: 'Invalid email or password. Please try again.',
+  OAuthAccountNotLinked: 'This email is already registered with a password. Please use password login instead.',
+  OAuthSignin: 'Error signing in with OAuth provider.',
+  OAuthCallback: 'Error during OAuth callback.',
+  default: 'An error occurred during sign in. Please try again.'
+}
+
 export default function LoginPage() {
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [warning, setWarning] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { data: session, status } = useSession()
   const searchParams = useSearchParams()
   
-  // Get error from URL if present
+  // Get error or success message from URL if present
   useEffect(() => {
     const errorParam = searchParams?.get('error')
+    const verifiedParam = searchParams?.get('verified')
+    const warningParam = searchParams?.get('warning')
+    
     if (errorParam === 'OAuthAccountNotLinked') {
       setError('This email is already registered with a password. Please use password login instead.')
     } else if (errorParam) {
       setError(errorParam)
     }
+    
+    if (verifiedParam === 'true') {
+      setSuccess('Email verified successfully! You can now log in.')
+    }
+
+    if (warningParam) {
+      setWarning(warningParam)
+    }
   }, [searchParams])
   
-  // Redirect if already authenticated
-  if (status === 'authenticated') {
-    router.push('/argue')
-  }
-  //TODO: add password strength check and email validation
+  // Redirect if already authenticated - using useEffect to avoid React state updates during render
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/argue')
+    }
+  }, [status, router])
+  
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsLoading(true)
     setError('')
+    setSuccess('')
 
     const formData = new FormData(e.target as HTMLFormElement)
     const email = formData.get('email') as string
     const password = formData.get('password') as string
 
+    if (!email || !password) {
+      setError('Please provide both email and password')
+      setIsLoading(false)
+      return
+    }
+
     try {
-      await signIn('credentials', {
+      const result = await signIn('credentials', {
         email,
         password,
-        callbackUrl: '/argue'
+        redirect: false
       })
+
+      if (result?.error) {
+        // Map error to user-friendly message
+        const errorMessage = errorMessages[result.error] || errorMessages.default
+        setError(errorMessage)
+        setIsLoading(false)
+        return
+      }
+
+      if (result?.ok) {
+        // Successful login, redirect to the callback URL or default URL
+        router.push('/argue')
+      }
     } catch (error: any) {
       console.error('Login error:', error)
       setError(error.message || 'An error occurred')
@@ -53,9 +97,11 @@ export default function LoginPage() {
   async function handleGoogleSignIn() {
     setIsLoading(true)
     setError('')
+    setSuccess('')
 
     try {
       await signIn('google', { callbackUrl: '/argue' })
+      // Note: For OAuth providers, we still redirect since it's handled by a popup/redirect flow
     } catch (error: any) {
       console.error('Continue with Google error:', error)
       setError(error.message || 'Failed to continue with Google')
@@ -81,6 +127,16 @@ export default function LoginPage() {
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                   <span className="block sm:inline">{error}</span>
+                </div>
+              )}
+              {success && (
+                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+                  <span className="block sm:inline">{success}</span>
+                </div>
+              )}
+              {warning && (
+                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+                  <span className="block sm:inline">{warning}</span>
                 </div>
               )}
               <div className="space-y-4">
